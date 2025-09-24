@@ -1,0 +1,256 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>Plinko</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap');
+  body{
+    margin:0;
+    background:#023c1a;
+    color:#ffd700;
+    display:flex;
+    flex-direction:column;
+    align-items:center;
+    font-family:'Press Start 2P',sans-serif;
+    overflow-x:hidden;
+  }
+  h1{
+    color:#ffd700;
+    text-shadow:0 0 8px #ff0000,0 0 4px #000;
+  }
+  canvas{
+    background:#0b2e16;
+    margin-top:10px;
+    border:4px solid #ffd700;
+    border-radius:8px;
+    box-shadow:0 0 15px #000 inset;
+  }
+  button, input, select{
+    margin:5px;
+    padding:8px 12px;
+    border:none;
+    background:linear-gradient(#b8860b,#8b7500);
+    color:#ffd700;
+    cursor:pointer;
+    border-radius:4px;
+    font-weight:bold;
+    text-shadow:0 0 2px #000;
+    font-family:'Press Start 2P',sans-serif;
+  }
+  button:hover, select:hover{
+    background:linear-gradient(#c99d12,#a87f09);
+  }
+  input{
+    width:60px;
+    background:#111;
+    color:#ffd700;
+    text-align:center;
+  }
+  select{
+    background:#111;
+    color:#ffd700;
+    font-weight:bold;
+  }
+  .multipliers{
+    display:flex;
+    justify-content:center;
+    flex-wrap:wrap;
+    max-width:400px;
+    margin-top:5px;
+  }
+  .mult{
+    flex:1 0 40px;
+    text-align:center;
+    font-size:12px;
+    color:#ff4;
+    text-shadow:0 0 4px #ff0,0 0 8px #ffa500;
+  }
+  #notification{
+    position:fixed;
+    top:10px;
+    background:#8b0000;
+    color:#ffd700;
+    padding:10px 20px;
+    border-radius:6px;
+    font-family:'Press Start 2P',sans-serif;
+    text-shadow:0 0 2px #000;
+    display:none;
+    z-index:1000;
+  }
+  #disclaimer{
+    margin-top:10px;
+    font-size:10px;
+    color:#ffcc00;
+    text-align:center;
+    text-shadow:0 0 2px #000;
+  }
+</style>
+</head>
+<body>
+<div id="notification"></div>
+<h1>Plinko</h1>
+<div>
+  Bet: $<input id="bet" type="number" value="10" min="1" step="1">
+  Balls: <input id="balls" type="number" value="1" min="1" max="20">
+  Balance: $<span id="balance">0</span>
+</div>
+<div>
+  Risk:
+  <select id="risk">
+    <option value="low">Low</option>
+    <option value="medium" selected>Medium</option>
+    <option value="high">High</option>
+    <option value="ultra">Ultra</option>
+  </select>
+  <button id="dropBtn">Drop</button>
+  <button id="resetBtn">Reset Balance</button>
+</div>
+<canvas id="plinkoCanvas" width="400" height="500"></canvas>
+<div class="multipliers" id="multipliers"></div>
+<div id="disclaimer">Nothing is real money, and if you drop too many balls your computer may lag.</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/matter-js/0.19.0/matter.min.js"></script>
+<script>
+const { Engine, Render, Runner, World, Bodies, Events, Body } = Matter;
+
+const canvas = document.getElementById('plinkoCanvas');
+const engine = Engine.create();
+engine.world.gravity.y = 0.6;
+const render = Render.create({
+  canvas: canvas,
+  engine: engine,
+  options: {
+    width: canvas.width,
+    height: canvas.height,
+    wireframes: false,
+    background: '#0b2e16'
+  }
+});
+Render.run(render);
+const runner = Runner.create();
+Runner.run(runner, engine);
+const world = engine.world;
+
+// local storage for balance
+let balance = parseInt(localStorage.getItem('plinkoBalance')||'1000');
+const balanceEl=document.getElementById('balance');
+function updateBalance(val){
+  balance=val;
+  balanceEl.textContent=balance;
+  localStorage.setItem('plinkoBalance',balance);
+}
+updateBalance(balance);
+
+// notification
+function notify(msg){
+  const n = document.getElementById('notification');
+  n.textContent=msg;
+  n.style.display='block';
+  setTimeout(()=>{n.style.display='none'},1000);
+}
+
+document.getElementById('resetBtn').addEventListener('click',()=>{
+  if(confirm("Reset your balance to $1000?")){
+    updateBalance(1000);
+  }
+});
+
+// walls
+const walls = [
+  Bodies.rectangle(200, -10, 400, 20, {isStatic:true}),
+  Bodies.rectangle(200, 510, 400, 20, {isStatic:true}),
+  Bodies.rectangle(-10, 250, 20, 500, {isStatic:true}),
+  Bodies.rectangle(410, 250, 20, 500, {isStatic:true})
+];
+World.add(world, walls);
+
+// pegs
+const pegRadius = 5;
+const rows = 9;
+const cols = 11;
+const gapX = 36;
+const gapY = 38;
+function addPegs(){
+  for(let r=0;r<rows;r++){
+    for(let c=0;c<cols;c++){
+      const offset = (r%2)*gapX/2;
+      const x = c*gapX+offset+20;
+      const y = r*gapY+60;
+      if(x>10 && x<390){
+        World.add(world,Bodies.circle(x,y,pegRadius,{isStatic:true,render:{fillStyle:'#ffd700'}}));
+      }
+    }
+  }
+}
+addPegs();
+
+// bins and multipliers
+const binCount=10;
+let multipliers=[];
+const multDiv=document.getElementById('multipliers');
+
+function setMultipliers(risk){
+  if(risk==='low') multipliers=[0.9,0.95,1,1.05,1.1,1.05,1,0.95,0.9,0.9];
+  else if(risk==='medium') multipliers=[0.5,0.75,1,2,5,2,1,0.75,0.5,0.5];
+  else if(risk==='high') multipliers=[0,0.2,0.5,5,10,5,0.5,0.2,0,0];
+  else multipliers=[0,0,0.1,10,100,10,0.1,0,0,0];
+  multDiv.innerHTML='';
+  multipliers.forEach(m=>{
+    const d=document.createElement('div');
+    d.className='mult';
+    d.textContent=m+'x';
+    multDiv.appendChild(d);
+  });
+}
+setMultipliers('medium');
+
+document.getElementById('risk').addEventListener('change',e=>{
+  setMultipliers(e.target.value);
+});
+
+// bin separators
+for(let i=0;i<=binCount;i++){
+  World.add(world,Bodies.rectangle(i*40,470,4,60,{isStatic:true,render:{fillStyle:'#ffd700'}}));
+}
+
+// spawn ball(s)
+function spawnBall(x,bet){
+  updateBalance(balance-bet);
+  const ball = Bodies.circle(x,20,6,{restitution:0.4,friction:0.002,render:{fillStyle:'#fff'}});
+  ball.bet=bet;
+  Body.setVelocity(ball,{x:(Math.random()-0.5)*2,y:0});
+  World.add(world,ball);
+}
+
+document.getElementById('dropBtn').addEventListener('click',()=>{
+  const count=parseInt(document.getElementById('balls').value);
+  const bet=parseInt(document.getElementById('bet').value);
+  const total=bet*count;
+  if(total>balance){
+    notify('Not enough balance');
+    return;
+  }
+  for(let i=0;i<count;i++){
+    spawnBall(150+Math.random()*100,bet);
+  }
+});
+
+// check when ball hits bottom bins
+Events.on(engine,'afterUpdate',()=>{
+  for(const body of world.bodies){
+    if(body.label==='Circle Body' && body.position.y>480 && body.bet){
+      const index=Math.floor(body.position.x/40);
+      if(index>=0 && index<multipliers.length){
+        const winnings=body.bet*parseFloat(multipliers[index]);
+        updateBalance(balance+Math.floor(winnings));
+      }
+      Matter.World.remove(world,body);
+    }
+  }
+});
+</script>
+</body>
+</html>
+
