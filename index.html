@@ -145,7 +145,7 @@ const world = engine.world;
 function formatNum(n){return n.toString().replace(/\B(?=(\d{3})+(?!\d))/g,",");}
 
 // local storage for balance
-let balance = parseInt(localStorage.getItem('plinkoBalance')||'10'); // starting balance $10
+let balance = parseInt(localStorage.getItem('plinkoBalance')||'100'); // starting balance $100
 const balanceEl=document.getElementById('balance');
 function updateBalance(val){
   balance=val;
@@ -164,8 +164,8 @@ function notify(msg){
 
 // reset balance button
 document.getElementById('resetBtnCorner').addEventListener('click',()=>{
-  updateBalance(10);
-  notify('Balance reset to $10');
+  updateBalance(100);
+  notify('Balance reset to $100');
 });
 
 // walls
@@ -203,12 +203,13 @@ let multipliers=[];
 const multDiv=document.getElementById('multipliers');
 
 function setMultipliers(risk){
-  if(risk==='verylow') multipliers=[0.95,0.97,1,1.02,1.05,1.02,1,0.97,0.95,0.95];
-  else if(risk==='low') multipliers=[0.9,0.95,1,1.05,1.1,1.05,1,0.95,0.9,0.9];
-  else if(risk==='medium') multipliers=[0.5,0.75,1,2,5,2,1,0.75,0.5,0.5];
-  else if(risk==='high') multipliers=[0,0.2,0.5,5,10,5,0.5,0.2,0,0];
-  else if(risk==='ultra') multipliers=[0,0,0.1,10,100,10,0.1,0,0,0];
-  else if(risk==='extreme') multipliers=[0,0,0,50,200,50,0,0,0,0];
+  // slightly higher chances to win big, but still grindy
+  if(risk==='verylow') multipliers=[0.95,0.97,1,1.05,1.1,1.1,1.05,1,0.97,0.95];
+  else if(risk==='low') multipliers=[0.9,0.95,1,1.1,1.2,1.2,1.1,1,0.95,0.9];
+  else if(risk==='medium') multipliers=[0,0.25,0.5,1,5,5,1,0.5,0.25,0]; // 5x is now possible
+  else if(risk==='high') multipliers=[0,0,0.2,0.5,7,7,0.5,0.2,0,0]; // 7x possible
+  else if(risk==='ultra') multipliers=[0,0,0,0.5,12,12,0.5,0,0,0]; // 12x possible
+  else if(risk==='extreme') multipliers=[0,0,0,1,20,20,1,0,0,0]; // 20x possible
 
   multDiv.innerHTML='';
   multipliers.forEach((m)=>{
@@ -219,6 +220,7 @@ function setMultipliers(risk){
     multDiv.appendChild(d);
   });
 }
+
 setMultipliers('medium');
 document.getElementById('risk').addEventListener('change',e=>{
   setMultipliers(e.target.value);
