@@ -55,17 +55,17 @@
   }
   .multipliers{
     display:flex;
-    justify-content:center;
     flex-wrap:wrap;
     max-width:400px;
     margin-top:5px;
   }
   .mult{
-    flex:1 0 40px;
+    width:40px;
     text-align:center;
-    font-size:12px;
+    font-size:8px; /* further reduced */
     color:#ff4;
     text-shadow:0 0 4px #ff0,0 0 8px #ffa500;
+    margin:0;
   }
   #notification{
     position:fixed;
@@ -99,10 +99,12 @@
 <div>
   Risk:
   <select id="risk">
+    <option value="verylow">Very Low</option>
     <option value="low">Low</option>
     <option value="medium" selected>Medium</option>
     <option value="high">High</option>
     <option value="ultra">Ultra</option>
+    <option value="extreme">Extreme</option>
   </select>
   <button id="dropBtn">Drop</button>
   <button id="resetBtn">Reset Balance</button>
@@ -133,12 +135,15 @@ const runner = Runner.create();
 Runner.run(runner, engine);
 const world = engine.world;
 
+// format numbers with commas
+function formatNum(n){return n.toString().replace(/\B(?=(\d{3})+(?!\d))/g,",");}
+
 // local storage for balance
 let balance = parseInt(localStorage.getItem('plinkoBalance')||'1000');
 const balanceEl=document.getElementById('balance');
 function updateBalance(val){
   balance=val;
-  balanceEl.textContent=balance;
+  balanceEl.textContent=formatNum(balance);
   localStorage.setItem('plinkoBalance',balance);
 }
 updateBalance(balance);
@@ -152,7 +157,7 @@ function notify(msg){
 }
 
 document.getElementById('resetBtn').addEventListener('click',()=>{
-  if(confirm("Reset your balance to $1000?")){
+  if(confirm("Reset your balance to $1,000?")){
     updateBalance(1000);
   }
 });
@@ -192,14 +197,18 @@ let multipliers=[];
 const multDiv=document.getElementById('multipliers');
 
 function setMultipliers(risk){
-  if(risk==='low') multipliers=[0.9,0.95,1,1.05,1.1,1.05,1,0.95,0.9,0.9];
+  if(risk==='verylow') multipliers=[0.95,0.97,1,1.02,1.05,1.02,1,0.97,0.95,0.95];
+  else if(risk==='low') multipliers=[0.9,0.95,1,1.05,1.1,1.05,1,0.95,0.9,0.9];
   else if(risk==='medium') multipliers=[0.5,0.75,1,2,5,2,1,0.75,0.5,0.5];
   else if(risk==='high') multipliers=[0,0.2,0.5,5,10,5,0.5,0.2,0,0];
-  else multipliers=[0,0,0.1,10,100,10,0.1,0,0,0];
+  else if(risk==='ultra') multipliers=[0,0,0.1,10,100,10,0.1,0,0,0];
+  else if(risk==='extreme') multipliers=[0,0,0,50,200,50,0,0,0,0];
+
   multDiv.innerHTML='';
-  multipliers.forEach(m=>{
+  multipliers.forEach((m)=>{
     const d=document.createElement('div');
     d.className='mult';
+    d.style.fontSize='7px'; // slightly smaller to avoid overlap
     d.textContent=m+'x';
     multDiv.appendChild(d);
   });
@@ -253,4 +262,3 @@ Events.on(engine,'afterUpdate',()=>{
 </script>
 </body>
 </html>
-
